@@ -1,0 +1,81 @@
+// ============================================================================
+// DAX Measures Reference -- Smart Environmental Monitoring & Analysis System
+// Paste these into Power BI Desktop via: Modeling -> New Measure
+// Assumes your imported table is named "sensor_readings" with columns:
+//   device_id, temperature, humidity, aqi, recorded_at
+// and an "alerts" table with: alert_type, severity, message, created_at
+// ============================================================================
+
+// --- Page 1: KPI Cards -------------------------------------------------------
+Avg Temperature = ROUND(AVERAGE(sensor_readings[temperature]), 1)
+
+Avg Humidity = ROUND(AVERAGE(sensor_readings[humidity]), 1)
+
+Avg AQI = ROUND(AVERAGE(sensor_readings[aqi]), 1)
+
+Max Temperature = MAX(sensor_readings[temperature])
+
+Min Temperature = MIN(sensor_readings[temperature])
+
+Total Readings = COUNTROWS(sensor_readings)
+
+Poor AQI Count = CALCULATE(COUNTROWS(sensor_readings), sensor_readings[aqi] >= 150)
+
+High Temp Count = CALCULATE(COUNTROWS(sensor_readings), sensor_readings[temperature] >= 38)
+
+
+// --- Page 3: Environmental Health Score -------------------------------------
+// Weighted composite: AQI 50% | Temperature 30% | Humidity 20%
+// (mirrors analytics.calculate_health_score() in the Python backend)
+Environmental Health Score =
+VAR AqiScore = MAX(0, 100 - (AVERAGE(sensor_readings[aqi]) / 5))
+VAR TempScore =
+    IF(
+        AVERAGE(sensor_readings[temperature]) >= 20 && AVERAGE(sensor_readings[temperature]) <= 26,
+        100,
+        MAX(0, 100 - (ABS(AVERAGE(sensor_readings[temperature]) - 23) * 6.67))
+    )
+VAR HumidityScore =
+    IF(
+        AVERAGE(sensor_readings[humidity]) >= 40 && AVERAGE(sensor_readings[humidity]) <= 60,
+        100,
+        MAX(0, 100 - (ABS(AVERAGE(sensor_readings[humidity]) - 50) * 2.5))
+    )
+RETURN ROUND(0.5 * AqiScore + 0.3 * TempScore + 0.2 * HumidityScore, 1)
+
+
+// --- Page 2: Pollution Trend Analysis ----------------------------------------
+// Positive value = AQI worsening vs the prior 7-day window
+AQI Trend (7-day slope) =
+VAR Recent =
+    AVERAGEX(
+        FILTER(sensor_readings, sensor_readings[recorded_at] >= TODAY() - 7),
+        sensor_readings[aqi]
+    )
+VAR Previous =
+    AVERAGEX(
+        FILTER(
+            sensor_readings,
+            sensor_readings[recorded_at] < TODAY() - 7 && sensor_readings[recorded_at] >= TODAY() - 14
+        ),
+        sensor_readings[aqi]
+    )
+RETURN Recent - Previous
+
+Pollution Trend Label =
+VAR Slope = [AQI Trend (7-day slope)]
+RETURN
+    SWITCH(
+        TRUE(),
+        Slope > 5, "WORSENING",
+        Slope < -5, "IMPROVING",
+        "STABLE"
+    )
+
+
+// --- Page 3: Alert Table helpers ---------------------------------------------
+Critical Alert Count = CALCULATE(COUNTROWS(alerts), alerts[severity] = "CRITICAL")
+
+High Alert Count = CALCULATE(COUNTROWS(alerts), alerts[severity] = "HIGH")
+
+Total Alerts (Selected Period) = COUNTROWS(alerts)

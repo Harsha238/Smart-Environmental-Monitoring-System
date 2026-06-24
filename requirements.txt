@@ -1,0 +1,22 @@
+# Smart Environmental Monitoring & Analysis System - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# --- Backend / API ---
+Flask==3.0.3
+flask-cors==4.0.1
+mysql-connector-python==8.4.0
+python-dotenv==1.0.1
+
+# --- Sensor Simulator ---
+requests==2.32.3
+
+# --- Data Analytics ---
+pandas==2.2.2
+numpy==1.26.4
+
+# --- Machine Learning ---
+scikit-learn==1.5.0
+joblib==1.4.2
+
+# --- Visualization ---
+matplotlib==3.9.0
